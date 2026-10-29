@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net10.0-windows;net9.0-windows;net8.0-windows;net48</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Description>A lightweight AvalonDock integration for NuExt.Minimal.Mvvm.Wpf, providing dockable documents and document management services.</Description>
+    <RootNamespace>Minimal.Mvvm.AvalonDock</RootNamespace>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591;NETSDK1233</NoWarn>
+    <VersionPrefix>0.8.3-pre</VersionPrefix>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Dirkster.AvalonDock" Version="5.0.2-preview.142" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(NuExt_UseLocalProjects)' != 'true'">
+    <PackageReference Include="NuExt.Minimal.Mvvm.Wpf" Version="0.8.3" />
+    <PackageReference Include="NuExt.Minimal.Mvvm.SourceGenerator" Version="0.8.3">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(NuExt_UseLocalProjects)' == 'true'">
+    <ProjectReference Include="..\..\NuExt.Minimal.Mvvm.Wpf\src\NuExt.Minimal.Mvvm.Wpf.csproj" />
+    <ProjectReference Include="..\..\NuExt.Minimal.Mvvm.SourceGenerator\src\NuExt.Minimal.Mvvm.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+</Project>

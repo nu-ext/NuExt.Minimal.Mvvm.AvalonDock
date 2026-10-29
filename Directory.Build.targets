@@ -1,0 +1,13 @@
+<Project>
+  <ItemGroup>
+    <CsFiles Include="**\*.*.cs" Exclude="**\*.xaml.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Update="@(CsFiles)">
+      <DependentUpon>$([System.Text.RegularExpressions.Regex]::Replace('%(Filename)', '\..*$', '.cs'))</DependentUpon>
+    </Compile>
+    <Compile Update="**\*BindingProxy.cs">
+      <DependentUpon>$([System.String]::Copy('%(Filename)').Replace('BindingProxy', '.cs'))</DependentUpon>
+    </Compile>
+  </ItemGroup>
+</Project>
