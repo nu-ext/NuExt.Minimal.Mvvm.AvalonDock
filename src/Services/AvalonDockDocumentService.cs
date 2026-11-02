@@ -17,11 +17,11 @@ public sealed class AvalonDockDocumentService : DocumentServiceBase, IAsyncDocum
 {
     #region DockableDocument
 
-    private sealed class DockableDocument : AsyncDisposable, IAsyncDocument
+    private sealed class DockableDocument : AsyncDisposable, IAsyncDocument, IViewModelProvider
     {
         private readonly AsyncLifetime _lifetime = new AsyncLifetime() { ContinueOnCapturedContext = true }
 #if DEBUG
-                .SetDebugInfo()
+            .SetDebugInfo()
 #endif
             ;
 
@@ -34,7 +34,7 @@ public sealed class AvalonDockDocumentService : DocumentServiceBase, IAsyncDocum
             Owner = owner ?? throw new ArgumentNullException(nameof(owner));
             LayoutDocument = layoutDocument ?? throw new ArgumentNullException(nameof(layoutDocument));
 
-            var viewModel = ViewModelHelper.GetViewModelFromView(LayoutDocument.Content);
+            var viewModel = ViewModel;
             Debug.Assert(viewModel != null);
 
             _lifetime.AddDisposable(_cts);
@@ -43,6 +43,7 @@ public sealed class AvalonDockDocumentService : DocumentServiceBase, IAsyncDocum
             _lifetime.Add(() => AvalonViewModelHelper.DetachContentFromContainer(LayoutDocument));//2) detach content
             _lifetime.AddAsync(DisposeViewModelAsync);//1) dispose vm
             _lifetime.AddBracket(() => SetDocument(LayoutDocument, this), () => SetDocument(LayoutDocument, null));
+
             if (viewModel != null && ViewModelHelper.ViewModelHasTitleProperty(viewModel))
             {
                 _lifetime.AddBracket(
@@ -58,6 +59,19 @@ public sealed class AvalonDockDocumentService : DocumentServiceBase, IAsyncDocum
                     () => dpd.RemoveValueChanged(LayoutDocument, OnLayoutDocumentTitleChanged));
             }
             Debug.Assert(dpd != null);
+
+            if (LayoutDocument.Content is FrameworkElement view)
+            {
+                var viewModelPropertyDescriptor = DependencyPropertyDescriptor.FromProperty(FrameworkElement.DataContextProperty, typeof(FrameworkElement));
+
+                if (viewModelPropertyDescriptor != null)
+                {
+                    _lifetime.AddBracket(
+                        () => viewModelPropertyDescriptor.AddValueChanged(view, OnViewModelChanged),
+                        () => viewModelPropertyDescriptor.RemoveValueChanged(view, OnViewModelChanged));
+                }
+                Debug.Assert(viewModelPropertyDescriptor != null);
+            }
         }
 
         #region Properties
@@ -80,7 +94,10 @@ public sealed class AvalonDockDocumentService : DocumentServiceBase, IAsyncDocum
             set => LayoutDocument.Title = value;
         }
 
-        public bool IsHidden => _hiddenDocumentIndex != -1;
+        /// <inheritdoc/>
+        public object? ViewModel => ViewModelHelper.GetViewModelFromView(LayoutDocument.Content);
+
+        private bool IsHidden => _hiddenDocumentIndex != -1;
 
         public bool IsClosing { get; private set; }
 
@@ -95,6 +112,11 @@ public sealed class AvalonDockDocumentService : DocumentServiceBase, IAsyncDocum
         private void OnLayoutDocumentTitleChanged(object? sender, EventArgs e)
         {
             OnPropertyChanged(EventArgsCache.TitlePropertyChanged);
+        }
+
+        private void OnViewModelChanged(object? sender, EventArgs e)
+        {
+            OnPropertyChanged(EventArgsCache.ViewModelPropertyChanged);
         }
 
         #endregion
@@ -157,30 +179,6 @@ public sealed class AvalonDockDocumentService : DocumentServiceBase, IAsyncDocum
             }
         }
 
-        protected override async ValueTask DisposeAsyncCore()
-        {
-            Debug.Assert(ContinueOnCapturedContext);
-            Debug.Assert(CheckAccess());
-            VerifyAccess();
-#if NET8_0_OR_GREATER
-            await _cts.CancelAsync();
-#else
-            _cts.Cancel();
-#endif
-            //Hide(); do not remove from layout here
-            await _lifetime.DisposeAsync();
-        }
-
-        private async ValueTask DisposeViewModelAsync()
-        {
-            var viewModel = ViewModelHelper.GetViewModelFromView(LayoutDocument.Content);
-            Debug.Assert(viewModel != null);
-            if (DisposeOnClose && viewModel is IAsyncDisposable asyncDisposable)
-            {
-                await asyncDisposable.DisposeAsync();
-            }
-        }
-
         /// <inheritdoc/>
         public void Hide()
         {
@@ -207,6 +205,7 @@ public sealed class AvalonDockDocumentService : DocumentServiceBase, IAsyncDocum
 
             if (LayoutDocument.Parent is null)
             {
+                Debug.Assert(IsHidden);
                 LayoutDocumentPane? pane = _hiddenDocumentPane;
 
                 if (pane?.Root is null || !ReferenceEquals(pane.Root, Owner.AssociatedObject?.Layout))
@@ -225,6 +224,32 @@ public sealed class AvalonDockDocumentService : DocumentServiceBase, IAsyncDocum
             LayoutDocument.IsActive = true;
         }
 
+        protected override async ValueTask DisposeAsyncCore()
+        {
+            Debug.Assert(ContinueOnCapturedContext);
+            Debug.Assert(CheckAccess());
+            VerifyAccess();
+#if NET8_0_OR_GREATER
+            await _cts.CancelAsync();
+#else
+            _cts.Cancel();
+#endif
+            //Hide(); do not remove from layout here
+            await _lifetime.DisposeAsync();
+        }
+
+        private ValueTask DisposeViewModelAsync()
+        {
+            var viewModel = ViewModel;
+            Debug.Assert(viewModel != null);
+
+            if (DisposeOnClose && viewModel is IAsyncDisposable asyncDisposable)
+            {
+                return asyncDisposable.DisposeAsync();
+            }
+            return ValueTask.CompletedTask;
+        }
+
         private void RemoveFromLayout()
         {
             if (LayoutDocument.Parent is {} container)
@@ -239,7 +264,7 @@ public sealed class AvalonDockDocumentService : DocumentServiceBase, IAsyncDocum
 
     #endregion
 
-    private readonly ObservableCollection<IAsyncDocument> _documents = [];
+    private readonly ObservableCollection<DockableDocument> _documents = [];
 
     private bool _isActiveDocumentChanging;
 
@@ -248,6 +273,7 @@ public sealed class AvalonDockDocumentService : DocumentServiceBase, IAsyncDocum
     public AvalonDockDocumentService()
     {
         if (ViewModelHelper.IsInDesignMode) return;
+
         (_documents as INotifyPropertyChanged).PropertyChanged += OnDocumentsPropertyChanged;
     }
 
@@ -371,11 +397,13 @@ public sealed class AvalonDockDocumentService : DocumentServiceBase, IAsyncDocum
     private void OnDockingManagerLoaded(object sender, RoutedEventArgs e)
     {
         Debug.Assert(Equals(sender, AssociatedObject));
-        if (sender is FrameworkElement fe)
+
+        if (sender is FrameworkElement element)
         {
-            fe.Loaded -= OnDockingManagerLoaded;
+            element.Loaded -= OnDockingManagerLoaded;
         }
-        Debug.Assert(_subscription == null);
+
+        Debug.Assert(_subscription is null);
         Disposable.DisposeAndNull(ref _subscription);
         _subscription = SubscribeDockingManager(AssociatedObject);
     }
@@ -384,19 +412,21 @@ public sealed class AvalonDockDocumentService : DocumentServiceBase, IAsyncDocum
 
     #region Methods
 
-    private void AddDocument(IAsyncDocument document)
+    private void AddDocument(DockableDocument document)
     {
         VerifyAccess();
         _documents.Add(document);
     }
 
-    private void RemoveDocument(IAsyncDocument document)
+    private void RemoveDocument(DockableDocument document)
     {
         VerifyAccess();
         _documents.Remove(document);
 
         if (!ReferenceEquals(ActiveDocument, document))
+        {
             return;
+        }
 
         ActiveDocument = AssociatedObject?.Layout.ActiveContent is LayoutDocument layoutDocument ? GetDocument(layoutDocument) : null;
     }
@@ -469,7 +499,7 @@ public sealed class AvalonDockDocumentService : DocumentServiceBase, IAsyncDocum
         {
             return;
         }
-        await Task.WhenAll(_documents.ToList().Select(async x => await x.CloseAsync(force: true).ConfigureAwait(false))).ConfigureAwait(false);
+        await Task.WhenAll(_documents.ToList().Select(static async x => await x.CloseAsync(force: true).ConfigureAwait(false))).ConfigureAwait(false);
         if (_documents.Count == 0)
         {
             return;
@@ -505,6 +535,7 @@ public sealed class AvalonDockDocumentService : DocumentServiceBase, IAsyncDocum
     {
         try
         {
+            Disposable.DisposeAndNull(ref _subscription);
             await CloseAllAsync().ConfigureAwait(false);
         }
         finally
@@ -517,7 +548,7 @@ public sealed class AvalonDockDocumentService : DocumentServiceBase, IAsyncDocum
     protected override void OnAttached()
     {
         base.OnAttached();
-        Debug.Assert(_subscription == null);
+        Debug.Assert(_subscription is null);
 
         if (AssociatedObject!.IsLoaded)
         {
@@ -541,7 +572,7 @@ public sealed class AvalonDockDocumentService : DocumentServiceBase, IAsyncDocum
 
     private Lifetime? SubscribeDockingManager(DockingManager? manager)
     {
-        if (manager == null)
+        if (manager is null)
         {
             return null;
         }
@@ -575,4 +606,5 @@ internal static partial class EventArgsCache
 {
     internal static readonly PropertyChangedEventArgs CountPropertyChanged = new(nameof(IAsyncDocumentManagerService.Count));
     internal static readonly PropertyChangedEventArgs TitlePropertyChanged = new(nameof(IAsyncDocument.Title));
+    internal static readonly PropertyChangedEventArgs ViewModelPropertyChanged = new(nameof(IViewModelProvider.ViewModel));
 }
