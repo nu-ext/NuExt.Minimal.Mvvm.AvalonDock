@@ -10,7 +10,7 @@
 
 ## Compatibility
 
-- WPF on **.NET 8/9/10** and **.NET Framework 4.8+**
+- WPF on **.NET 8/9/10/11** and **.NET Framework 4.8+**
 - AvalonDock 5
 
 ## Installation
