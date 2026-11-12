@@ -13,7 +13,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Dirkster.AvalonDock" Version="5.0.2-preview.146" />
+    <PackageReference Include="Dirkster.AvalonDock" Version="5.0.2" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(NuExt_UseLocalProjects)' != 'true'">
