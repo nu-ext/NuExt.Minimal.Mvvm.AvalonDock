@@ -19,16 +19,16 @@ public static class DockingManagerExtensions
         return (DockZone)s_getAnchorableZoneMethod.Invoke(manager, [anchorable])!;
     }
 
-    private static readonly MethodInfo s_removeButtonFromAllBarsMethod = typeof(ToggleDockingManager).GetMethod(
-        "RemoveButtonFromAllBars", BindingFlags.Instance | BindingFlags.NonPublic)
-        ?? throw new MissingMethodException(typeof(ToggleDockingManager).FullName, "RemoveButtonFromAllBars");
+    private static readonly MethodInfo s_removeFromAllBarsMethod = typeof(ToggleDockingManager).GetMethod(
+        "RemoveFromAllBars", BindingFlags.Instance | BindingFlags.NonPublic)
+        ?? throw new MissingMethodException(typeof(ToggleDockingManager).FullName, "RemoveFromAllBars");
 
     public static void RemoveAnchorableButton(this ToggleDockingManager manager, LayoutAnchorable anchorable)
     {
         ArgumentNullException.ThrowIfNull(manager);
         ArgumentNullException.ThrowIfNull(anchorable);
-
-        s_removeButtonFromAllBarsMethod.Invoke(manager, [anchorable]);
+        //anchorable.Hide();
+        s_removeFromAllBarsMethod.Invoke(manager, [anchorable]);
     }
 
     /// <summary>
