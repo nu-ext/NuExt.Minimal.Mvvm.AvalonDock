@@ -5,4 +5,5 @@
     <File Path="README.md" />
   </Folder>
   <Project Path="src/NuExt.Minimal.Mvvm.AvalonDock.csproj" />
+  <Project Path="tests/NuExt.Minimal.Mvvm.AvalonDock.Tests.csproj" />
 </Solution>
