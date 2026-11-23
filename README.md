@@ -109,6 +109,8 @@ Tool windows managed by `ToggleDockingManager` must be created before the manage
 - [NuExt.System](https://github.com/nu-ext/NuExt.System)
 - [NuExt.System.Data](https://github.com/nu-ext/NuExt.System.Data)
 - [NuExt.System.Data.SQLite](https://github.com/nu-ext/NuExt.System.Data.SQLite)
+- [NuExt.Minimal.Mvvm.Desktop](https://github.com/nu-ext/NuExt.Minimal.Mvvm.Desktop)
+- [NuExt.Minimal.Mvvm.Desktop.Persistence](https://github.com/nu-ext/NuExt.Minimal.Mvvm.Desktop.Persistence)
 
 ## Contributing
 
