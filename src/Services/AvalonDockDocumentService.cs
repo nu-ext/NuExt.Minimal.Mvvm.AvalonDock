@@ -15,6 +15,14 @@ namespace Minimal.Mvvm.Wpf;
 /// </summary>
 public sealed class AvalonDockDocumentService : DocumentServiceBase, IAsyncDocumentManagerService, IAsyncDisposable
 {
+    #region Dependency Properties
+
+    public static readonly DependencyProperty ShowHeaderProperty = DependencyProperty.Register(
+        nameof(ShowHeader), typeof(bool), typeof(AvalonDockDocumentService),
+        new PropertyMetadata(true, static (d, e) => ((AvalonDockDocumentService)d).OnShowHeaderChanged()));
+
+    #endregion
+
     #region DockableDocument
 
     private sealed class DockableDocument : AsyncDisposable, IAsyncDocument, IViewModelProvider
@@ -287,6 +295,27 @@ public sealed class AvalonDockDocumentService : DocumentServiceBase, IAsyncDocum
     /// <inheritdoc/>
     public IEnumerable<IAsyncDocument> Documents => _documents;
 
+    /// <summary>
+    /// Gets or sets a value indicating whether the header (tab strip) of the document pane is shown.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The value is applied to the <c>ShowHeader</c> property of the <see cref="LayoutDocumentPane"/> managed by this
+    /// service; it does not affect tool windows or other docking manager chrome. When the document pane is created
+    /// later, the current value is applied on the next layout update.
+    /// </para>
+    /// <para>
+    /// The default is <see langword="true"/>. A common scenario is to bind it to the <see cref="Count"/> of documents,
+    /// hiding the header while a single document is open (for example with <c>NumericToBooleanConverter</c>:
+    /// <c>GreaterThan</c> with converter parameter <c>1</c>).
+    /// </para>
+    /// </remarks>
+    public bool ShowHeader
+    {
+        get => (bool)GetValue(ShowHeaderProperty);
+        set => SetValue(ShowHeaderProperty, value);
+    }
+
     #endregion
 
     #region Event Handlers
@@ -406,6 +435,12 @@ public sealed class AvalonDockDocumentService : DocumentServiceBase, IAsyncDocum
         Debug.Assert(_subscription is null);
         Disposable.DisposeAndNull(ref _subscription);
         _subscription = SubscribeDockingManager(AssociatedObject);
+    }
+
+    private void OnShowHeaderChanged()
+    {
+        var layoutPane = AssociatedObject?.GetLayoutDocumentPane();
+        layoutPane?.ShowHeader = ShowHeader;
     }
 
     #endregion
@@ -595,6 +630,9 @@ public sealed class AvalonDockDocumentService : DocumentServiceBase, IAsyncDocum
         lifetime.AddBracket(
             () => manager.DocumentClosing += OnDockingManagerDocumentClosing,
             () => manager.DocumentClosing -= OnDockingManagerDocumentClosing);
+
+        var layoutPane = manager.GetLayoutDocumentPane();
+        layoutPane?.ShowHeader = ShowHeader;
 
         return lifetime;
     }
